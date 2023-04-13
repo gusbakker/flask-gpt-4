@@ -1,16 +1,15 @@
 from flask import Flask, render_template, request
 import os
 import openai
+from dotenv import load_dotenv
+
 
 app = Flask(__name__)
 
+load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-start_chat_log = """Human: Hello, I am Human.
-AI: Hello, human I am openai gpt3.
-Human: How are you?
-AI: I am fine, thanks for asking. 
-"""
+conversation = ""
 
 
 @app.route("/")
@@ -20,21 +19,21 @@ def home():
 
 @app.route("/get")
 def get_bot_response():
-    global start_chat_log
+    global conversation
     user_text = request.args.get('msg')
-    prompt = f"{start_chat_log}Human: {user_text}\nAI:"
-    response = openai.Completion.create(
-        engine="davinci",
-        prompt=prompt,
-        temperature=0.8,
-        max_tokens=200,
-        top_p=1,
-        frequency_penalty=0.0,
-        presence_penalty=0.5,
-        stop="\nHuman: "
+    human = f"Human: {user_text}"
+    print(human)
+    prompt = f"{conversation}{human}\nAI: "
+    response = openai.ChatCompletion.create(
+        model="gpt-4",
+        messages=[
+            {"role": "user", "content": prompt},
+        ],
+        temperature=0.7,
     )
-    ai_response = response.choices[0].text
-    start_chat_log += f"Human: {user_text}\nAI:{ai_response}\n"
+    ai_response = response['choices'][0]['message']['content']
+    conversation += f"{prompt}\n {ai_response}\n"
+    print(ai_response)
     return ai_response
 
 
