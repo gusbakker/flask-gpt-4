@@ -1,6 +1,6 @@
 # Web Chatbot with Flask & GPT-4
 
-#### A web Chatbot implementation of OpenAI GPT-4 using Flask.
+#### Very simple implementation of OpenAI GPT-4 using Flask.
 
 ## Local Setup:
  1. `pip install -r requirements.txt`
