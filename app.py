@@ -1,3 +1,5 @@
+from collections import deque
+
 from flask import Flask, render_template, request
 import os
 import openai
@@ -9,7 +11,7 @@ app = Flask(__name__)
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-conversation = ""
+conversation = deque(maxlen=10)
 
 
 @app.route("/")
@@ -29,7 +31,7 @@ def get_bot_response():
         messages=[
             {"role": "user", "content": prompt},
         ],
-        temperature=0.7,
+        temperature=0.9,
     )
     ai_response = response['choices'][0]['message']['content']
     conversation += f"{prompt}\n {ai_response}\n"
