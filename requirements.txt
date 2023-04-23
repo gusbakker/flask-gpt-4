@@ -1,3 +1,5 @@
-flask==2.2.2
-openai>=0.22.1
-python-dotenv==0.21.0
+flask==2.2.3
+openai==0.27.4
+python-dotenv==1.0.0
+Flask-SQLAlchemy==3.0.3
+googlesearch-python==1.2.3
