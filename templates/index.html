@@ -1,51 +1,278 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <link rel="stylesheet" type="text/css" href="/static/style.css">
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
-</head>
-<body>
-<h1>Flask GPT-4</h1>
-<!-- Place this tag where you want the button to render. -->
-<h3><a class="github-button" href="https://github.com/gusbakker/superchatbot" data-icon="octicon-star" data-size="large"
-       data-show-count="true" aria-label="Star gusbakker/superchatbot on GitHub">Star</a>
-</h3>
-<div>
-    <div id="chatbox">
-        <p class="botText"><span>Hi! I'm chatGPT (GPT-4). How can I help you?</span></p>
-    </div>
-    <div id="userInput">
-        <input id="textInput" type="text" name="msg" placeholder="Message">
-        <input id="buttonInput" type="submit" value="Send">
-    </div>
-    <!-- Place this tag in your head or just before your close body tag. -->
-    <script async defer src="https://buttons.github.io/buttons.js"></script>
-    <script>
-        function getBotResponse() {
-            var rawText = $("#textInput").val();
-            var userHtml = '<p class="userText"><span>' + rawText + '</span></p>';
-            $("#textInput").val("");
-            $("#chatbox").append(userHtml);
-            document.getElementById('userInput').scrollIntoView({block: 'start', behavior: 'smooth'});
-            $.get("/get", {msg: rawText}).done(function (data) {
-                var botHtml = '<p class="botText"><span>' + data + '</span></p>';
-                $("#chatbox").append(botHtml);
-                document.getElementById('userInput').scrollIntoView({block: 'start', behavior: 'smooth'});
-            });
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flask GPT-4</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/themes/prism.min.css" rel="stylesheet"/>
+    <style>
+        .chat-container {
+            height: calc(100vh - 180px);
+            overflow-y: auto;
         }
+        .user-message {
+            background-color: #f7f7f8;
+        }
+        .assistant-message {
+            background-color: #ffffff;
+        }
+        .typing-indicator::after {
+            content: '...';
+            animation: typing 1s infinite;
+        }
+        @keyframes typing {
+            0% { content: ''; }
+            25% { content: '.'; }
+            50% { content: '..'; }
+            75% { content: '...'; }
+            100% { content: ''; }
+        }
+        .copy-button {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background-color: rgba(240, 240, 240, 0.8);
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    cursor: pointer;
+    padding: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+}
 
-        $("#textInput").keypress(function (e) {
-            if ((e.which == 13) && document.getElementById("textInput").value != "") {
-                getBotResponse();
-            }
-        });
-        $("#buttonInput").click(function () {
-            if (document.getElementById("textInput").value != "") {
-                getBotResponse();
-            }
-        })
-    </script>
+.copy-button:hover {
+    background-color: rgba(220, 220, 220, 0.9);
+}
+
+.copy-button svg {
+    width: 16px;
+    height: 16px;
+}
+
+.copy-button.copied {
+    background-color: #4CAF50;
+    color: white;
+}
+
+pre[class*="language-"] {
+    position: relative;
+    padding-top: 30px;
+}
+    </style>
+</head>
+<body class="bg-gray-50">
+<div class="container mx-auto p-4">
+    <h1 class="text-3xl font-bold mb-4">Flask GPT-4</h1>
+    <div id="chatbox" class="chat-container border border-gray-300 rounded-lg p-4 mb-4"></div>
+    <form id="userInput" class="flex">
+        <input type="text" id="userMessage" class="flex-grow border border-gray-300 rounded-l-lg p-2"
+               placeholder="Type your message here...">
+        <button type="submit" class="bg-blue-500 text-white rounded-r-lg px-4 py-2">Send</button>
+    </form>
 </div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/2.0.3/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/components/prism-python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/components/prism-javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/components/prism-css.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/components/prism-json.min.js"></script>
+<script>
+    const chatbox = document.getElementById('chatbox');
+const userInput = document.getElementById('userInput');
+const userMessage = document.getElementById('userMessage');
 
+function addCopyButton(pre) {
+    const button = document.createElement('button');
+    button.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-copy"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
+    button.className = 'copy-button';
+    button.addEventListener('click', () => {
+        const codeText = pre.querySelector('code').textContent;
+        navigator.clipboard.writeText(codeText).then(() => {
+            button.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-check"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+            button.classList.add('copied');
+            setTimeout(() => {
+                button.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-copy"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
+                button.classList.remove('copied');
+            }, 2000);
+        }).catch(err => {
+            console.error('Failed to copy text: ', err);
+        });
+    });
+    pre.appendChild(button);
+}
+
+function formatCodeBlocks(content) {
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = content;
+
+    tempDiv.querySelectorAll('pre > code').forEach((code) => {
+        const pre = code.parentNode;
+        let language = code.className.replace('language-', '');
+        if (!language) language = 'javascript'; // default language
+        pre.classList.add(`language-${language}`);
+        Prism.highlightElement(pre);
+        addCopyButton(pre);
+    });
+
+    return tempDiv.innerHTML;
+}
+
+function smoothScroll(element, target, duration) {
+const start = element.scrollTop;
+const change = target - start;
+const increment = 20;
+let currentTime = 0;
+
+function animateScroll() {
+    currentTime += increment;
+    const val = Math.easeInOutQuad(currentTime, start, change, duration);
+    element.scrollTop = val;
+    if (currentTime < duration) {
+        setTimeout(animateScroll, increment);
+    }
+}
+
+Math.easeInOutQuad = function (t, b, c, d) {
+    t /= d / 2;
+    if (t < 1) return c / 2 * t * t + b;
+    t--;
+    return -c / 2 * (t * (t - 2) - 1) + b;
+};
+
+animateScroll();
+}
+
+function addMessage(content, isUser, isEditable = false) {
+const messageDiv = document.createElement('div');
+messageDiv.className = `p-4 mb-4 ${isUser ? 'user-message' : 'assistant-message'}`;
+
+if (isUser && isEditable) {
+    const editButton = document.createElement('button');
+    editButton.textContent = 'Edit';
+    editButton.className = 'edit-button bg-blue-500 text-white rounded px-2 py-1 text-sm float-right';
+    editButton.addEventListener('click', () => editMessage(messageDiv));
+    messageDiv.appendChild(editButton);
+}
+
+const contentDiv = document.createElement('div');
+contentDiv.innerHTML = marked(content);
+messageDiv.appendChild(contentDiv);
+
+chatbox.appendChild(messageDiv);
+
+// Delay formatting and scrolling to ensure proper rendering
+setTimeout(() => {
+    contentDiv.innerHTML = formatCodeBlocks(contentDiv.innerHTML);
+    smoothScroll(chatbox, chatbox.scrollHeight, 300);
+}, 0);
+
+return messageDiv;
+}
+
+function editMessage(messageDiv) {
+const contentDiv = messageDiv.querySelector('div');
+const originalContent = contentDiv.textContent;
+
+const textarea = document.createElement('textarea');
+textarea.value = originalContent;
+textarea.className = 'w-full p-2 border rounded';
+
+const saveButton = document.createElement('button');
+saveButton.textContent = 'Save';
+saveButton.className = 'bg-green-500 text-white rounded px-2 py-1 text-sm mr-2';
+
+const cancelButton = document.createElement('button');
+cancelButton.textContent = 'Cancel';
+cancelButton.className = 'bg-red-500 text-white rounded px-2 py-1 text-sm';
+
+const buttonContainer = document.createElement('div');
+buttonContainer.className = 'mt-2';
+buttonContainer.appendChild(saveButton);
+buttonContainer.appendChild(cancelButton);
+
+contentDiv.innerHTML = '';
+contentDiv.appendChild(textarea);
+contentDiv.appendChild(buttonContainer);
+
+saveButton.addEventListener('click', () => {
+    const newContent = textarea.value;
+    contentDiv.innerHTML = marked(newContent);
+    setTimeout(() => {
+        contentDiv.innerHTML = formatCodeBlocks(contentDiv.innerHTML);
+    }, 0);
+    regenerateFromMessage(messageDiv);
+});
+
+cancelButton.addEventListener('click', () => {
+    contentDiv.innerHTML = marked(originalContent);
+    setTimeout(() => {
+        contentDiv.innerHTML = formatCodeBlocks(contentDiv.innerHTML);
+    }, 0);
+});
+}
+
+async function regenerateFromMessage(messageDiv) {
+// Remove all messages after the edited message
+while (messageDiv.nextElementSibling) {
+    messageDiv.nextElementSibling.remove();
+}
+
+// Get the edited message content
+const editedContent = messageDiv.querySelector('div').textContent;
+
+// Generate a new response based on the edited message
+await generateResponse(editedContent);
+}
+
+async function generateResponse(message) {
+const assistantMessageDiv = addMessage('', false);
+const typingIndicator = document.createElement('span');
+typingIndicator.className = 'typing-indicator';
+typingIndicator.textContent = 'AI is typing';
+assistantMessageDiv.appendChild(typingIndicator);
+
+try {
+    const response = await fetch(`/get?msg=${encodeURIComponent(message)}`);
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let assistantResponse = '';
+
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value);
+        assistantResponse += chunk;
+        assistantMessageDiv.innerHTML = marked(assistantResponse);
+
+        // Delay formatting and scrolling to ensure proper rendering
+        setTimeout(() => {
+            assistantMessageDiv.innerHTML = formatCodeBlocks(assistantMessageDiv.innerHTML);
+            smoothScroll(chatbox, chatbox.scrollHeight, 300);
+        }, 0);
+    }
+
+    typingIndicator.remove();
+} catch (error) {
+    console.error('Error:', error);
+    assistantMessageDiv.innerHTML = 'Error: Failed to generate AI response.';
+}
+}
+
+userInput.addEventListener('submit', async (e) => {
+e.preventDefault();
+const message = userMessage.value.trim();
+if (message) {
+    addMessage(message, true, true);
+    userMessage.value = '';
+    await generateResponse(message);
+}
+});
+
+// Initial greeting
+addMessage('Hi! I\'m chatGPT (GPT-4). How can I help you?', false);
+</script>
 </body>
 </html>
